@@ -37,8 +37,38 @@ from collections import defaultdict
 from collections import Counter
 from pprint import pprint
 
-# Settings
-sns.set_style('white')
+# Variables
+LR= re.compile(r'((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)',
+                            re.DOTALL)
+UPDATES = ['-', '=', '+', '*','.', ',', '"',
+           "'", '?', '!', ':', ';', '(', ')',
+           '[', ']', '{', '}', 'amp', 'kkk',
+           'hahaha', 'haha', 'ha', 'RT', 'i’m',
+           '…', '–', 'http']
+
+# Emoticons
+HAPPY = set([
+    ':-)', ':)', ';)', ':o)', ':]', ':3', ':c)', ':>', '=]', '8)',
+    '=)', ':}', ':^)', ':-D', ':D', '8-D', '8D', 'x-D', 'xD', 'X-D',
+    'XD', '=-D', '=D', '=-3', '=3', ':-))', ":'-)", ":')", ':*',
+    ':^*', '>:P', ':-P', ':P', 'X-P', 'x-p', 'xp', 'XP', ':-p',
+    ':p', '=p', ':-b', ':b', '>:)', '>;)', '>:-)', '<3'])
+
+SAD = set([
+    ':L', ':-/', '>:/', ':S', '>:[', ':@', ':-(', ':[', ':-||', '=L',
+    ':<', ':-[', ':-<', '=\\', '=/', '>:(', ':(', '>.<', ":'-(", ":'(",
+    ':\\', ':-c', ':c', ':{', '>:\\', ';('])
+
+EMOJIS = re.compile("["
+                    u"\U0001F600-\U0001F64F"  # emoticons
+                    u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                    u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                    u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                    u"\U00002702-\U000027B0"
+                    u"\U000024C2-\U0001F251"
+                    "]+", flags=re.UNICODE)
+
+EP = ['@', '#']
 
 # Read in the data
 def format_data(csv_name):
@@ -57,24 +87,21 @@ def format_data(csv_name):
 # Removing @user references and links
 def strip_links(text):
     '''Removes links in text.'''
-    link_regex = re.compile(r'((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)',
-                            re.DOTALL)
-    links = re.findall(link_regex, text)
+    links = re.findall(LR, text)
     for link in links:
         text = text.replace(link[0], ', ')
     return text
 
 def strip_all_entities(text):
     '''Removes @user references and hashtags.'''
-    entity_prefixes = ['@', '#']
     for separator in string.punctuation:
-        if separator not in entity_prefixes:
+        if separator not in EP:
             text = text.replace(separator, ' ')
     words = list()
     for word in text.split():
         word = word.strip()
         if word:
-            if word[0] not in entity_prefixes:
+            if word[0] not in EP:
                 words.append(word)
     return ' '.join(words)
 
@@ -87,10 +114,7 @@ def create_document_corpus(df, column):
 def remove_common_words_and_tokenize(document_corpus):
     '''Removes common words and tokenizes text.'''
     stop_words = set(stopwords.words('english'))
-    stop_words.update(['-', '=', '+', '*','.', ',', '"', "'",
-                       '?', '!', ':', ';', '(', ')', '[', ']',
-                       '{', '}', 'amp', 'kkk', 'hahaha', 'haha',
-                       'ha', 'RT', 'i’m', '…', '–', 'http'])
+    stop_words.update(UPDATES)
     # including lower case letters ...
     stop_words.update([i for i in string.ascii_lowercase])
     # and upper-case
@@ -118,36 +142,8 @@ def remove_words_appearing_only_once(text_corpus):
 # Removing emojis
 def remove_emojis(text_corpus):
     '''Removes emojis and emoticons from text corpus.'''
-    # Emoticons and emojis
-    # HappyEmoticons
-    emoticons_happy = set([':-)', ':)', ';)', ':o)', ':]', ':3',
-                           ':c)', ':>', '=]', '8)', '=)', ':}',
-                           ':^)', ':-D', ':D', '8-D', '8D', 'x-D',
-                           'xD', 'X-D', 'XD', '=-D', '=D', '=-3',
-                           '=3', ':-))', ":'-)", ":')", ':*',
-                           ':^*', '>:P', ':-P', ':P', 'X-P',
-                           'x-p', 'xp', 'XP', ':-p', ':p', '=p',
-                           ':-b', ':b', '>:)', '>;)', '>:-)', '<3'])
-
-    # Sad Emoticons
-    emoticons_sad = set([':L', ':-/', '>:/', ':S', '>:[', ':@',
-                         ':-(', ':[', ':-||', '=L', ':<', ':-[',
-                         ':-<', '=\\', '=/', '>:(', ':(', '>.<',
-                         ":'-(", ":'(", ':\\', ':-c', ':c', ':{',
-                         '>:\\', ';('])
-
-    # Emoji patterns
-    emoji_pattern = re.compile("["
-             u"\U0001F600-\U0001F64F"  # emoticons
-             u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-             u"\U0001F680-\U0001F6FF"  # transport & map symbols
-             u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-             u"\U00002702-\U000027B0"
-             u"\U000024C2-\U0001F251"
-             "]+", flags=re.UNICODE)
-
     # Combine
-    emoticons = emoticons_happy.union(emoticons_sad)
+    emoticons = HAPPY.union(SAD)
     return [[token for token in text if token not in emoticons]
             for text in text_corpus]
 
@@ -167,21 +163,22 @@ def create_tfidf_model(corpus):
 # Initializing an LSI transformation
 def create_lsi_model(corpus_tfidf, model_name, id2word, num_topics):
     '''Initializes an LSI transformation of tf-idf model.'''
-    lsi = models.LsiModel(corpus_tfidf=corpus_tfidf, id2word=id2word, num_topics=num_topics)
+    lsi = models.LsiModel(corpus_tfidf, id2word, num_topics)
     # Model persistence: save(), load()
     lsi.save('models/' + model_name + '.lsi')
     lsi = models.LsiModel.load('models/' + model_name + '.lsi')
     return lsi, lsi[corpus_tfidf]
 
 # Initialize an LDA transformation
-def create_lda_model(corpus_tfidf, idf2word, num_topics):
+def create_lda_model(corpus_tfidf, id2word, num_topics):
     '''Initializes LDA transformation.'''
     # LDA Transformation
     lda = models.LdaModel(corpus_tfidf, id2word, num_topics)
     return lda, lda[corpus_tfidf]
 
 # Queries
-def query_similarity(doc, model_name, dict_of_doc, lsi_model, doc_corpus):
+def query_similarity(doc, model_name, dict_of_doc,
+                     lsi_model, doc_corpus, corpus):
     # Transform corpus to LSI space and index it
     index = similarities.MatrixSimilarity(lsi_model[corpus])
 
@@ -260,7 +257,7 @@ def word_counts_of_topic_keywords(lda_model, text_corpus):
                                       'word_count'])
 
 # Sentence Coloring of N Sentences
-def topics_per_document(model, corpus, start=0, end=1):
+def topics_per_document(model,lda, corpus, start=0, end=1):
     corpus_sel = corpus[start:end]
     dominant_topics, topic_percentages = list(), list()
     for i, corp in enumerate(corpus_sel):
@@ -301,50 +298,3 @@ def correlations(x, y, **kws):
                 xy=(.1, .6),
                 xycoords=ax.transAxes,
                 size=24)
-
-def smooth(x,window_len=11,window='hanning'):
-    '''smooth the data using a window with requested size.
-    
-    NB: Taken from scipy cookbook.
-    
-    This method is based on the convolution of a scaled window with the
-    signal. The signal is prepared by introducing reflected copies of
-    the signal (with the window size) in both ends so that transient
-    parts are minimized in the begining and end part of the output
-    signal.
-    
-    input:
-        x: the input signal 
-        window_len: the dimension of the smoothing window; should be an
-                    odd integer
-        window: the type of window from 'flat', 'hanning', 'hamming',
-                'bartlett', 'blackman'. Flat window will produce a
-                moving average smoothing.
-
-    output:
-        the smoothed signal
- 
-    TODO: the window parameter could be the window itself if an array
-          instead of a string
-    NOTE: length(output) != length(input), to correct this: return
-          y[(window_len/2-1):-(window_len/2)] instead of just y.
-    '''
-
-    if x.ndim != 1:
-        raise ValueError("smooth only accepts 1 dimension arrays.")
-    if x.size < window_len:
-        raise ValueError("Input vector needs to be bigger than window size.")
-    if window_len < 3:
-        return x
-    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError("Window is on of 'flat'," +
-                         " 'hanning', 'hamming', 'bartlett', 'blackman'")
-
-    s = np.r_[x[window_len-1:0:-1], x, x[-2:-window_len-1:-1]]
-    #print(len(s))
-    if window == 'flat': #moving average
-        w = np.ones(window_len, 'd')
-    else:
-        w = eval('np.' + window + '(window_len)')
-
-    return np.convolve(w/w.sum(), s, mode='valid')
