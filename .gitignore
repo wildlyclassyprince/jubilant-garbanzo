@@ -112,3 +112,6 @@ csv/
 # Data folder
 # NB: Data versioning is managed using dvc not git
 data/
+
+# Scala resources
+resources/
