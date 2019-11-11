@@ -18,7 +18,7 @@ object TwitterStreamTweets {
         
         // Twitter credentials
         try {
-            val configFile = "/home/dorutan/Documents/datascience/github.com/jubilant-garbanzo/tweet-streamer/src/main/resources/config.txt"
+            val configFile = "config.txt"
             val consumerKey :: consumerSecret :: accessToken :: accessTokenSecret :: _ = Source.fromFile(configFile).getLines.toList
 
             // Spark configuration and streaming contexts
