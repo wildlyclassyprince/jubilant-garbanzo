@@ -106,6 +106,9 @@ venv.bak/
 # JSON folders
 json/
 
-# CSV files - manage these with dvc
-.csv
-.CSV
+# CSV folders
+csv/
+
+# Data folder
+# NB: Data versioning is managed using dvc not git
+data/
